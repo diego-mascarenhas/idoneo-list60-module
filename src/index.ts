@@ -9,6 +9,9 @@ export type { List60Paths } from './paths'
 export type {
   List60Category,
   List60Contact,
+  List60Digest,
+  List60Intent,
+  List60Mood,
   List60ContactStatus,
   List60Entry,
   List60Index,

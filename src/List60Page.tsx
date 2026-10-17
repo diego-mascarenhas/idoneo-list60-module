@@ -5,7 +5,16 @@ import type { CSSProperties, ReactNode } from 'react'
 import { fetchList60, list60QueryKey } from './api'
 import { List60Avatar } from './List60Avatar'
 import { List60ChannelHint } from './List60ChannelHint'
+import { List60FollowUp } from './List60FollowUp'
+import { List60ResponsibleButton } from './List60Responsible'
+import { list60CategoryChipStyle, list60ChipClass, list60StatusChipStyle } from './chips'
 import type { List60Contact, List60Entry } from './types'
+
+function formatListStatus(status: string): string {
+  const attempt = status.match(/^([123]) Contactos?$/i)
+  if (!attempt) return status
+  return `${attempt[1]}º contacto`
+}
 
 function formatDate(value?: string | null): string {
   if (!value) return '—'
@@ -79,6 +88,7 @@ export function List60Page({
               entry={entry}
               action={slots?.action}
               below={slots?.below}
+              showInteraction={!interaction}
               onOpenContact={onOpenContact}
               opening={openingContactId === entry.contact.id}
               statusStyle={statusStyle}
@@ -104,6 +114,7 @@ function List60Card({
   entry,
   action,
   below,
+  showInteraction,
   onOpenContact,
   opening = false,
   statusStyle,
@@ -112,6 +123,7 @@ function List60Card({
   entry: List60Entry
   action?: ReactNode
   below?: ReactNode
+  showInteraction: boolean
   onOpenContact?: (contact: List60Contact) => void
   opening?: boolean
   statusStyle?: (name: string, labelClass?: string) => CSSProperties | undefined
@@ -120,72 +132,92 @@ function List60Card({
   const contact = entry.contact
 
   return (
-    <div className={cardClass}>
-      <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <button
-          type="button"
-          onClick={() => onOpenContact?.(contact)}
-          disabled={opening}
-          className="flex min-w-0 flex-1 items-start gap-3 text-left disabled:opacity-60"
-        >
-          <List60Avatar photoUrl={contact.photo_url} name={contact.display_name} email={contact.email} />
-          <div className="min-w-0">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <div className="truncate font-semibold">{contact.display_name}</div>
-              {entry.status && (
-                <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--warning)]">
-                  {entry.status}
-                </span>
-              )}
-              {contact.status && (
-                <span
-                  className="category-chip category-chip-sm shrink-0"
-                  style={statusStyle?.(contact.status.name, contact.status.label_class)}
-                >
-                  {contact.status.name}
-                </span>
-              )}
-            </div>
-            <div className="mt-1 truncate text-sm text-[var(--muted)]">{contact.email}</div>
-            {contact.categories.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {contact.categories.map((category) => (
-                  <span
-                    key={category.id}
-                    className="category-chip category-chip-sm"
-                    style={
-                      categoryStyle?.(category.color) ?? {
-                        borderColor: 'var(--border)',
-                        color: 'var(--accent-strong)',
-                        backgroundColor: 'var(--accent-soft)',
+    <List60FollowUp contactId={contact.id} showInteraction={showInteraction} digest={contact.digest} intent={contact.intent}>
+      {({ buttons, panel }) => (
+        <div className={cardClass}>
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <button
+              type="button"
+              onClick={() => onOpenContact?.(contact)}
+              disabled={opening}
+              className="flex min-w-0 flex-1 items-start gap-3 text-left disabled:opacity-60"
+            >
+              <List60Avatar
+                photoUrl={contact.photo_url}
+                name={contact.display_name}
+                email={contact.email}
+                sentiment={contact.sentiment}
+              />
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <div className="min-w-0 font-semibold">
+                    {contact.display_name}
+                    {contact.status?.name.trim().toLowerCase() === 'cliente' && contact.enterprise
+                      ? ` (${contact.enterprise})`
+                      : null}
+                  </div>
+                  {contact.status && (
+                    <span
+                      className={list60ChipClass}
+                      style={
+                        statusStyle?.(contact.status.name, contact.status.label_class) ??
+                        list60StatusChipStyle(contact.status.name, contact.status.label_class)
                       }
-                    }
-                  >
-                    {category.name}
-                  </span>
-                ))}
+                    >
+                      {contact.status.name}
+                    </span>
+                  )}
+                  {contact.intent?.name && (
+                    <span className={list60ChipClass} style={list60CategoryChipStyle()} title="Intención">
+                      {contact.intent.emoji} {contact.intent.name}
+                    </span>
+                  )}
+                  {entry.status && (
+                    <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--warning)]">
+                      {formatListStatus(entry.status)}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 truncate text-sm text-[var(--muted)]">{contact.email}</div>
+                {contact.categories.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {contact.categories.map((category) => (
+                      <span
+                        key={category.id}
+                        className={list60ChipClass}
+                        style={categoryStyle?.(category.color) ?? list60CategoryChipStyle(category.color)}
+                      >
+                        {category.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <List60ChannelHint contact={contact} />
+                {entry.notes && (
+                  <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--muted)]">{entry.notes}</p>
+                )}
               </div>
-            )}
-            <List60ChannelHint contact={contact} />
-            {entry.notes && (
-              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--muted)]">{entry.notes}</p>
-            )}
+            </button>
+            <div className="flex shrink-0 flex-col items-start gap-1.5 sm:items-end">
+              {buttons}
+              <button
+                type="button"
+                onClick={() => onOpenContact?.(contact)}
+                disabled={opening}
+                className="text-xs tabular-nums text-[var(--muted)] disabled:opacity-60"
+              >
+                Próximo {formatDate(entry.date_next)}
+              </button>
+              {entry.responsible && (
+                <List60ResponsibleButton entryId={entry.id} name={entry.responsible} responsibleId={entry.responsible_id} />
+              )}
+              {action}
+            </div>
           </div>
-        </button>
-        <div className="flex shrink-0 flex-col items-start gap-1.5 sm:items-end">
-          <button
-            type="button"
-            onClick={() => onOpenContact?.(contact)}
-            disabled={opening}
-            className="flex flex-col items-start gap-1 text-left disabled:opacity-60 sm:items-end"
-          >
-            <span className="text-xs tabular-nums text-[var(--muted)]">Próximo {formatDate(entry.date_next)}</span>
-            {entry.responsible && <span className="text-xs text-[var(--muted)]">{entry.responsible}</span>}
-          </button>
-          {action}
+          {panel}
+          {below}
         </div>
-      </div>
-      {below}
-    </div>
+      )}
+    </List60FollowUp>
   )
 }
